@@ -10,13 +10,17 @@ type Client(a) {
 }
 
 pub type Msg(a) {
-  Broadcast(msg: String)
+  Broadcast(origin: Pid, msg: String)
   AddClient(client: Subject(a))
   RemoveClient(pid: Pid)
 }
 
 type State(a) {
-  State(clients: Dict(Pid, Client(a)), selector: Selector(Msg(a)), send_to_client: fn(Subject(a), String) -> Nil)
+  State(
+    clients: Dict(Pid, Client(a)),
+    selector: Selector(Msg(a)),
+    send_to_client: fn(Subject(a), Pid, String) -> Nil,
+  )
 }
 
 // Selectors are needed to listen to more than one subject. In this case,
@@ -36,9 +40,9 @@ fn build_selector(clients: Dict(Pid, Client(a))) {
 
 fn handle_message(msg: Msg(a), state: State(a)) -> actor.Next(Msg(a), State(a)) {
   case msg {
-    Broadcast(m) -> {
+    Broadcast(pid, m) -> {
       dict.map_values(state.clients, fn(_pid, c) {
-        state.send_to_client(c.subject, m)
+        state.send_to_client(c.subject, pid, m)
       })
       actor.continue(state)
     }
@@ -63,13 +67,16 @@ fn handle_message(msg: Msg(a), state: State(a)) -> actor.Next(Msg(a), State(a)) 
   }
 }
 
-fn handle_init(send_msg: fn(Subject(a), String) -> Nil) {
+fn handle_init(send_msg: fn(Subject(a), Pid, String) -> Nil) {
   let selector = process.new_selector()
-  let state = State(clients: dict.new(), selector: selector, send_to_client: send_msg)
+  let state =
+    State(clients: dict.new(), selector: selector, send_to_client: send_msg)
   actor.Ready(state, selector)
 }
 
-pub fn start(send_to_client: fn(Subject(a), String) -> Nil) -> Result(Subject(Msg(a)), StartError) {
+pub fn start(
+  send_to_client: fn(Subject(a), Pid, String) -> Nil,
+) -> Result(Subject(Msg(a)), StartError) {
   actor.start_spec(Spec(
     init: fn() { handle_init(send_to_client) },
     init_timeout: 10,

@@ -18,12 +18,12 @@ fn receive_loop(client, socket) {
   receive_loop(client, socket)
 }
 
-type LoopError {
+type AcceptLoopError {
   LoopSocketReason(SocketReason)
   LoopStartError(StartError)
 }
 
-fn accept_loop(app: Subject(app.Msg(client.Msg)), listener) -> Result(Nil, LoopError) {
+fn accept_loop(app: Subject(app.Msg(client.Msg)), listener) -> Result(Nil, AcceptLoopError) {
   // Accept the new connection
   use socket <- result.then(
     tcp.accept(listener)
@@ -36,16 +36,16 @@ fn accept_loop(app: Subject(app.Msg(client.Msg)), listener) -> Result(Nil, LoopE
     |> map_error(LoopStartError),
   )
 
-  // Start a receiver process that sends a message to the client every time 
-  // a message is received.
+  // Start a receiver process that waits until a message arrives in the socket
+  // and then forwards it to the client.
   process.start(
     fn() {
-      // Link the receiver process with the client so that if this process quits,
-      // the client also quits and vice versa.
-      process.link(process.subject_owner(client))
-
       // Receive messages from the socket and send them to the client actor.
       receive_loop(client, socket)
+
+      // Shutdown the client once the connection closes
+      io.println("Client quit")
+      actor.send(client, client.Shutdown)
     },
     linked: False,
   )

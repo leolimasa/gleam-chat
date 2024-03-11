@@ -6,7 +6,7 @@ import client
 
 pub fn main() {
   let assert Ok(app) = app.start(
-    fn (subject, msg) { actor.send(subject, client.Send(msg)) }
+    fn (subject, pid, msg) { actor.send(subject, client.Send(pid, msg)) }
   )
   server.start(app, 3030)
 
