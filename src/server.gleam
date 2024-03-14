@@ -1,65 +1,57 @@
-import glisten.{type SocketReason}
-import glisten/tcp
-import glisten/socket/options.{ActiveMode, Passive}
+import glisten.{User, Packet}
 import gleam/bit_array
-import gleam/otp/actor.{type StartError}
-import gleam/erlang/process.{type Subject}
+import gleam/otp/actor.{InitFailed}
+import gleam/erlang/process.{type Subject, type Pid, Abnormal}
 import gleam/io
-import gleam/result.{map_error}
-import client
-import app
+import gleam/option.{Some}
+import gleam/function
+import gleam/bytes_builder
+import gleam/string
+import gleam/result
 
-fn receive_loop(client, socket) {
-  use message <- result.then(tcp.receive(socket, 0))
-  case bit_array.to_string(message) {
-    Ok(s) -> actor.send(client, client.Receive(s))
-    Error(_e) -> io.println("Could not decode message")
-  }
-  receive_loop(client, socket)
+pub type ClientMsg {
+  Send(msg: String)
 }
 
-type AcceptLoopError {
-  LoopSocketReason(SocketReason)
-  LoopStartError(StartError)
-}
-
-fn accept_loop(app: Subject(app.Msg(client.Msg)), listener) -> Result(Nil, AcceptLoopError) {
-  // Accept the new connection
-  use socket <- result.then(
-    tcp.accept(listener)
-    |> map_error(LoopSocketReason),
-  )
-
-  // Start a new client
-  use client <- result.then(
-    client.start(app, socket)
-    |> map_error(LoopStartError),
-  )
-
-  // Start a receiver process that waits until a message arrives in the socket
-  // and then forwards it to the client.
-  process.start(
+pub fn start(
+  on_new_client: fn(Subject(ClientMsg)) -> Nil,
+  on_message: fn(String) -> Nil,
+  port: Int,
+) {
+  glisten.handler(
     fn() {
-      // Receive messages from the socket and send them to the client actor.
-      receive_loop(client, socket)
-
-      // Shutdown the client once the connection closes
-      io.println("Client quit")
-      actor.send(client, client.Shutdown)
+      let subj = process.new_subject()
+      on_new_client(subj)
+      #(Nil, Some(process.new_selector() |> process.selecting(subj, function.identity))) 
     },
-    linked: False,
-  )
-
-  // Receive another message
-  accept_loop(app, listener)
-}
-
-pub fn start(app: Subject(app.Msg(client.Msg)), port: Int) {
-  process.start(
-    fn() {
-      use listener <- result.map(tcp.listen(port, [ActiveMode(Passive)]))
-      accept_loop(app, listener)
-    },
-    linked: False,
-  )
+    fn(msg, state, conn) {
+      case msg {
+        Packet(p) -> {
+          case bit_array.to_string(p) {
+            Ok(p_str) -> on_message(p_str)
+            Error(e) -> {
+              io.println("could not decode packet")
+              io.debug(e)
+            }
+          }
+          actor.continue(state)
+        }
+        User(Send(m)) -> {
+          case glisten.send(conn, bytes_builder.from_string(m)) {
+            Ok(_) -> {
+              actor.continue(state)
+            }
+            Error(e) -> {
+              io.println("could not send message")
+              io.debug(e)
+              actor.continue(state)
+            }
+          }
+        }
+      }
+    })
+    |> glisten.serve(port)
+    |> result.map_error(fn (e) {
+       InitFailed(Abnormal(string.inspect(e)))
+    })
 }

@@ -1,14 +1,19 @@
 import gleam/erlang/process
 import gleam/otp/actor
+import gleam/otp/supervisor.{add, worker}
 import app
 import server
-import client
 
 pub fn main() {
-  let assert Ok(app) = app.start(
-    fn (subject, pid, msg) { actor.send(subject, client.Send(pid, msg)) }
-  )
-  server.start(app, 3030)
+  let assert Ok(app) = app.start()
+  server.start(
+    fn(client) {
+      actor.send(app, app.AddClient(client))
+    },
+    fn(msg) {
+      actor.send(app, app.Broadcast(process.self(), msg))
+    },
+    3030)
 
   process.sleep_forever()
 }

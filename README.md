@@ -1,25 +1,36 @@
 # chat
 
-[![Package Version](https://img.shields.io/hexpm/v/chat)](https://hex.pm/packages/chat)
-[![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/chat/)
+A simple TCP chat demo to demonstrate gleam concurrency patterns.
 
-```sh
-gleam add chat
-```
-```gleam
-import chat
 
-pub fn main() {
-  // TODO: An example of the project in use
-}
-```
+Here is a list of the major concurrency concepts. For a deeper explanation, see https://github.com/bcpeinhardt/learn_otp_with_gleam
 
-Further documentation can be found at <https://hexdocs.pm/chat>.
+## Processes
 
-## Development
+TODO
 
-```sh
-gleam run   # Run the project
-gleam test  # Run the tests
-gleam shell # Run an Erlang shell
-```
+## Subjects
+
+TODO
+
+## Tasks
+
+## Actors
+
+* You can change what the actor listens to ON THE FLY by changing it's selector to include more (or less) subjects
+* Do that with process.new_selector() 
+
+## Selectors
+
+Selectors allow listening on more than one `Subject`.
+If you create a new `Subject`, you can pass it to the selector of an actor so that it can be listened to.
+Selectors have only one message type, so you'll need to map it appropriately.
+
+## Monitors
+
+Monitors when 
+
+## Links
+
+## Supervisors
+
