@@ -4,7 +4,6 @@ import gleam/erlang/process.{
   type Pid, type ProcessDown, type ProcessMonitor, type Selector, type Subject,
 }
 import gleam/dict.{type Dict}
-import gleam/result.{try}
 import server
 
 type Client {
